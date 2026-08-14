@@ -1,19 +1,19 @@
 using NewsTelegramNotifier;
 using Telegram.Bot;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 // Recupera credenziali da variabili d'ambiente o fallback per test
-string botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN") ?? "INSERISCI_IL_TUO_BOT_TOKEN";
-string chatId = Environment.GetEnvironmentVariable("TELEGRAM_CHAT_ID") ?? "INSERISCI_IL_TUO_CHAT_ID";
+string botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN") ?? "8786192362:AAF2uIijb4PNkjSTmZThDrWwA6wvM-EZKGI";
+string chatId = Environment.GetEnvironmentVariable("TELEGRAM_CHAT_ID") ?? "1113321581";
 
-// Iniezione delle dipendenze
+// Iniezione dipendenze
 builder.Services.AddSingleton<AppState>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<NewsScannerService>();
 builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient(botToken));
 
-// Registrazione handler comandi Telegram
+// Handler per i comandi Telegram
 builder.Services.AddSingleton<TelegramBotHandler>(sp =>
     new TelegramBotHandler(
         sp.GetRequiredService<ITelegramBotClient>(),
@@ -21,7 +21,7 @@ builder.Services.AddSingleton<TelegramBotHandler>(sp =>
         chatId
     ));
 
-// Background Worker per la scansione
+// Worker in background per la scansione automatica
 builder.Services.AddHostedService(sp =>
     new NewsWorker(
         sp.GetRequiredService<AppState>(),
@@ -30,11 +30,21 @@ builder.Services.AddHostedService(sp =>
         chatId
     ));
 
-var host = builder.Build();
+var app = builder.Build();
 
-// Avvio ascolto comandi Telegram in background
-var botClient = host.Services.GetRequiredService<ITelegramBotClient>();
-var handler = host.Services.GetRequiredService<TelegramBotHandler>();
+// Avvio ascolto Telegram
+var botClient = app.Services.GetRequiredService<ITelegramBotClient>();
+var handler = app.Services.GetRequiredService<TelegramBotHandler>();
 botClient.StartReceiving(handler.HandleUpdateAsync, handler.HandlePollingErrorAsync);
 
-await host.RunAsync();
+// Endpoint di stato per Google Cloud Run (Health Check)
+app.MapGet("/", (AppState state) => new
+{
+    status = "Online",
+    active = state.IsActive(),
+    intervalMinutes = state.IntervalMinutes,
+    topicsCount = state.GetTopics().Count,
+    processedNews = state.SeenNewsIds.Count
+});
+
+app.Run();
