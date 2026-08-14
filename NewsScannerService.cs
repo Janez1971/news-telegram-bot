@@ -4,14 +4,11 @@ using System.Xml;
 
 namespace NewsTelegramNotifier;
 
-public record NewsArticle(string Id, string Title, string Summary, string Url, string Source, DateTime PublishDate);
-
 public class NewsScannerService
 {
     private readonly AppState _state;
     private readonly HttpClient _httpClient;
 
-    // Elenco fonti accreditate
     private readonly List<(string SourceName, string FeedUrl)> _trustedFeeds = new()
     {
         ("Il Sole 24 Ore - Economia", "https://www.ilsole24ore.com/rss/economia.xml"),
@@ -20,7 +17,6 @@ public class NewsScannerService
         ("CNBC - Markets", "https://search.cnbc.com/rs/search/combinedList/view.xml?partnerId=wrss01&id=10000664")
     };
 
-    // Parole chiave per il topic finanziario pre-settato
     private readonly string[] _marketKeywords = new[]
     {
         "borsa", "borse", "inflazione", "bce", "fed", "wall street", "spread", "btp",
@@ -34,9 +30,9 @@ public class NewsScannerService
         _httpClient = httpClient;
     }
 
-    public async Task<List<NewsArticle>> ScanNewArticlesAsync()
+    public async Task<List<NewsItem>> ScanNewArticlesAsync()
     {
-        var matchedArticles = new List<NewsArticle>();
+        var matchedArticles = new List<NewsItem>();
         var currentTopics = _state.GetTopics();
 
         if (currentTopics.Count == 0) return matchedArticles;
@@ -51,14 +47,13 @@ public class NewsScannerService
 
                 if (feed == null) continue;
 
-                foreach (var item in feed.Items.Take(15)) // Controlla le ultime 15 per fonte
+                foreach (var item in feed.Items.Take(15))
                 {
-                    string id = item.Id ?? item.Links.FirstOrDefault()?.Uri.ToString() ?? item.Title.Text;
+                    string id = item.Id ?? item.Links.FirstOrDefault()?.Uri.ToString() ?? item.Title?.Text ?? Guid.NewGuid().ToString();
 
-                    // Se già inviata in precedenza, salta
                     if (_state.SeenNewsIds.ContainsKey(id)) continue;
 
-                    string title = item.Title?.Text ?? "";
+                    string title = item.Title?.Text ?? "Senza titolo";
                     string rawSummary = item.Summary?.Text ?? "";
                     string cleanSummary = StripHtml(rawSummary);
                     string url = item.Links.FirstOrDefault()?.Uri.ToString() ?? "";
@@ -68,10 +63,9 @@ public class NewsScannerService
 
                     string fullText = $"{title} {cleanSummary}";
 
-                    // Verifica se matcha uno degli argomenti attivi
                     if (MatchesAnyTopic(fullText, currentTopics))
                     {
-                        matchedArticles.Add(new NewsArticle(id, title, cleanSummary, url, sourceName, pubDate));
+                        matchedArticles.Add(new NewsItem(id, title, cleanSummary, url, sourceName, pubDate));
                     }
                 }
             }
@@ -90,13 +84,11 @@ public class NewsScannerService
         {
             if (topic.Equals(AppState.DefaultTopic, StringComparison.OrdinalIgnoreCase))
             {
-                // Controllo euristico parole chiave di borsa/finanza
                 if (_marketKeywords.Any(k => text.Contains(k, StringComparison.OrdinalIgnoreCase)))
                     return true;
             }
             else
             {
-                // Match per parola/frase dell'argomento inserito dall'utente
                 if (text.Contains(topic, StringComparison.OrdinalIgnoreCase))
                     return true;
             }

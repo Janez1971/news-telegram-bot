@@ -25,7 +25,7 @@ public class TelegramBotHandler : IUpdateHandler
         var message = update.Message;
         string chatId = message.Chat.Id.ToString();
 
-        // Controllo di sicurezza: rispondi solo al proprietario
+        // Controllo di sicurezza: rispondi solo al proprietario autorizzato
         if (chatId != _authorizedChatId) return;
 
         string text = message.Text.Trim();
@@ -45,40 +45,40 @@ public class TelegramBotHandler : IUpdateHandler
                 var response = list.Count == 0 
                     ? "⚠️ Nessun argomento attivo." 
                     : "📋 *Argomenti attualmente monitorati:*\n\n" + string.Join("\n", list.Select((t, i) => $"{i + 1}. `{t}`"));
-                await _bot.SendMessage(chatId, response, parseMode: ParseMode.Markdown, cancellationToken: ct);
+                await _bot.SendTextMessageAsync(chatId, response, parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             case "/aggiungi":
                 if (string.IsNullOrWhiteSpace(args))
                 {
-                    await _bot.SendMessage(chatId, "❌ Specifica uno o più argomenti separati da virgola.\n_Es: /aggiungi semiconduttori, intelligenza artificiale_", parseMode: ParseMode.Markdown, cancellationToken: ct);
+                    await _bot.SendTextMessageAsync(chatId, "❌ Specifica uno o più argomenti separati da virgola.\n_Es: /aggiungi semiconduttori, intelligenza artificiale_", parseMode: ParseMode.Markdown, cancellationToken: ct);
                     return;
                 }
                 var toAdd = args.Split(',', StringSplitOptions.RemoveEmptyEntries);
                 _state.AddTopics(toAdd);
-                await _bot.SendMessage(chatId, $"✅ Aggiunti {toAdd.Length} argomenti!", cancellationToken: ct);
+                await _bot.SendTextMessageAsync(chatId, $"✅ Aggiunti {toAdd.Length} argomenti!", cancellationToken: ct);
                 break;
 
             case "/rimuovi":
                 if (string.IsNullOrWhiteSpace(args))
                 {
-                    await _bot.SendMessage(chatId, "❌ Specifica uno o più argomenti da rimuovere separati da virgola.", cancellationToken: ct);
+                    await _bot.SendTextMessageAsync(chatId, "❌ Specifica uno o più argomenti da rimuovere separati da virgola.", cancellationToken: ct);
                     return;
                 }
                 var toRemove = args.Split(',', StringSplitOptions.RemoveEmptyEntries);
                 _state.RemoveTopics(toRemove);
-                await _bot.SendMessage(chatId, $"🗑️ Rimossi gli argomenti indicati.", cancellationToken: ct);
+                await _bot.SendTextMessageAsync(chatId, "🗑️ Argomenti rimossi con successo.", cancellationToken: ct);
                 break;
 
             case "/intervallo":
                 if (int.TryParse(args, out int minutes) && minutes >= 1)
                 {
                     _state.IntervalMinutes = minutes;
-                    await _bot.SendMessage(chatId, $"⏱️ Intervallo di scansione impostato a *{minutes} minuti*.", parseMode: ParseMode.Markdown, cancellationToken: ct);
+                    await _bot.SendTextMessageAsync(chatId, $"⏱️ Intervallo impostato a *{minutes} minuti*.", parseMode: ParseMode.Markdown, cancellationToken: ct);
                 }
                 else
                 {
-                    await _bot.SendMessage(chatId, "❌ Inserisci un numero valido di minuti (es. `/intervallo 30`).", parseMode: ParseMode.Markdown, cancellationToken: ct);
+                    await _bot.SendTextMessageAsync(chatId, "❌ Inserisci un numero di minuti valido (es. `/intervallo 30`).", parseMode: ParseMode.Markdown, cancellationToken: ct);
                 }
                 break;
 
@@ -87,11 +87,11 @@ public class TelegramBotHandler : IUpdateHandler
                 {
                     _state.IsSuspendedIndefinitely = false;
                     _state.SuspendedUntilUtc = DateTime.UtcNow.AddMinutes(pauseMin);
-                    await _bot.SendMessage(chatId, $"⏸️ Scansione sospesa per *{pauseMin} minuti* (riattivazione automatica alle {DateTime.Now.AddMinutes(pauseMin):HH:mm}).", parseMode: ParseMode.Markdown, cancellationToken: ct);
+                    await _bot.SendTextMessageAsync(chatId, $"⏸️ Scansione sospesa per *{pauseMin} minuti* (riattivazione automatica alle {DateTime.Now.AddMinutes(pauseMin):HH:mm}).", parseMode: ParseMode.Markdown, cancellationToken: ct);
                 }
                 else
                 {
-                    await _bot.SendMessage(chatId, "❌ Inserisci i minuti di sospensione (es. `/sospendi 60`).", parseMode: ParseMode.Markdown, cancellationToken: ct);
+                    await _bot.SendTextMessageAsync(chatId, "❌ Inserisci i minuti di sospensione (es. `/sospendi 60`).", parseMode: ParseMode.Markdown, cancellationToken: ct);
                 }
                 break;
 
@@ -99,14 +99,14 @@ public class TelegramBotHandler : IUpdateHandler
             case "/pausa":
                 _state.IsSuspendedIndefinitely = true;
                 _state.SuspendedUntilUtc = null;
-                await _bot.SendMessage(chatId, "🛑 *Scansione sospesa a tempo indeterminato.* Usa `/riattiva` per ripartire.", parseMode: ParseMode.Markdown, cancellationToken: ct);
+                await _bot.SendTextMessageAsync(chatId, "🛑 *Scansione sospesa a tempo indeterminato.* Usa `/riattiva` per riprendere.", parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             case "/riattiva":
             case "/resume":
                 _state.IsSuspendedIndefinitely = false;
                 _state.SuspendedUntilUtc = null;
-                await _bot.SendMessage(chatId, "▶️ *Scansione riattivata con successo!*", parseMode: ParseMode.Markdown, cancellationToken: ct);
+                await _bot.SendTextMessageAsync(chatId, "▶️ *Scansione riattivata con successo!*", parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             case "/stato":
@@ -121,11 +121,11 @@ public class TelegramBotHandler : IUpdateHandler
                                    $"• Intervallo: ogni *{_state.IntervalMinutes} min*\n" +
                                    $"• Argomenti attivi: *{_state.GetTopics().Count}*\n" +
                                    $"• Notizie in memoria: *{_state.SeenNewsIds.Count}*";
-                await _bot.SendMessage(chatId, statusMsg, parseMode: ParseMode.Markdown, cancellationToken: ct);
+                await _bot.SendTextMessageAsync(chatId, statusMsg, parseMode: ParseMode.Markdown, cancellationToken: ct);
                 break;
 
             default:
-                await _bot.SendMessage(chatId, "Comando non riconosciuto. Invia /help per la lista comandi.", cancellationToken: ct);
+                await _bot.SendTextMessageAsync(chatId, "Comando non riconosciuto. Invia /help per la lista comandi.", cancellationToken: ct);
                 break;
         }
     }
@@ -141,18 +141,12 @@ public class TelegramBotHandler : IUpdateHandler
                       "🛑 `/stop` - Sospende a tempo indeterminato\n" +
                       "▶️ `/riattiva` - Riattiva la scansione\n" +
                       "📊 `/stato` - Mostra lo stato attuale del sistema";
-        await _bot.SendMessage(_authorizedChatId, help, parseMode: ParseMode.Markdown, cancellationToken: ct);
+        await _bot.SendTextMessageAsync(_authorizedChatId, help, parseMode: ParseMode.Markdown, cancellationToken: ct);
     }
 
     public Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
     {
         Console.WriteLine($"[ERRORE TELEGRAM] {exception.Message}");
-        return Task.CompletedTask;
-    }
-
-    public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
-    {
-        Console.WriteLine($"[ERRORE TELEGRAM] {source}: {exception.Message}");
         return Task.CompletedTask;
     }
 }

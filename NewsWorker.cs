@@ -30,7 +30,6 @@ public class NewsWorker : BackgroundService
                 {
                     var news = await _scanner.ScanNewArticlesAsync();
 
-                    // Se non ci sono novità rispetto alle precedenti scansioni, non invia nulla!
                     if (news.Count > 0)
                     {
                         foreach (var item in news)
@@ -40,12 +39,9 @@ public class NewsWorker : BackgroundService
                                          $"📝 *Sintesi:*\n{EscapeMarkdown(item.Summary)}\n\n" +
                                          $"🔗 [Leggi l'articolo completo]({item.Url})";
 
-                            await _bot.SendMessage(_chatId, msg, parseMode: ParseMode.Markdown, cancellationToken: stoppingToken);
+                            await _bot.SendTextMessageAsync(_chatId, msg, parseMode: ParseMode.Markdown, disableWebPagePreview: false, cancellationToken: stoppingToken);
                             
-                            // Registra la notizia come già vista per non re-inviarla
                             _state.SeenNewsIds.TryAdd(item.Id, 0);
-
-                            // Pausa di 1 secondo tra messaggi per rispettare i rate-limit di Telegram
                             await Task.Delay(1000, stoppingToken);
                         }
                     }
@@ -56,7 +52,6 @@ public class NewsWorker : BackgroundService
                 }
             }
 
-            // Attesa dinamica in base all'intervallo configurato
             int waitMinutes = _state.IntervalMinutes;
             await Task.Delay(TimeSpan.FromMinutes(waitMinutes), stoppingToken);
         }
